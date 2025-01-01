@@ -1,273 +1,193 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Python Chat App</title>
-		<script
-			src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"
-			integrity="sha512-luMnTJZ7oEchNDZAtQhgjomP1eZefnl82ruTH/3Oj/Yu5qYtwL7+dVRccACS/Snp1lFXq188XFipHKYE75IaQQ=="
-			crossorigin="anonymous"
-			referrerpolicy="no-referrer"
-		></script>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Chat App</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-header, .room-header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-size: 24px;
+        }
+        .chat-window {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #fff;
+            padding: 10px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            margin-bottom: 15px;
+        }
+        .message .username {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .message .time {
+            color: #aaa;
+            font-size: 0.85em;
+        }
+        .input-row {
+            margin-top: 20px;
+            display: flex;
+        }
+        .input-row input, .input-row button, select {
+            margin-right: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .input-row button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .input-row button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-header">Python Chat App</div>
+        
+        <div class="room-header">
+            <span id="room-name">Room: General</span>
+            <button id="create-room-button">Create Room</button>
+            <button id="leave-room-button">Leave Room</button>
+        </div>
 
-		<style>
-			:root {
-				--primary-color: #4a90e2;
-				--primary-light: #5da8ff;
-				--primary-dark: #3a7cbd;
-				--secondary-color: #e8f1f8;
-				--text-color: #2c3e50;
-				--bg-color: #f0f8ff;
-				--message-bg: #e1eeff;
-				--system-message-color: #8fa4b8;
-			}
+        <div id="room-creation" style="display: none;">
+            <input type="text" id="room-name-input" placeholder="Enter room name">
+            <select id="room-type-select">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+            </select>
+            <input type="password" id="room-password-input" placeholder="Enter password (if private)" style="display: none;">
+            <button id="confirm-room-button">Create</button>
+        </div>
 
-			body {
-				font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-				margin: 0;
-				padding: 0;
-				background-color: var(--bg-color);
-				color: var(--text-color);
-			}
+        <div class="chat-window" id="chat-window">
+            <!-- Messages will appear here -->
+        </div>
 
-			.chat-container {
-				max-width: 800px;
-				margin: 20px auto;
-				background-color: white;
-				border-radius: 15px;
-				box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-				overflow: hidden;
-			}
+        <div class="input-row">
+            <input type="text" id="message-input" placeholder="Type a message">
+            <button id="send-button">Send</button>
+            <button id="emoji-button">😀</button>
+        </div>
 
-			.chat-header {
-				background-color: var(--primary-color);
-				color: white;
-				padding: 20px;
-				text-align: center;
-				font-size: 24px;
-				font-weight: bold;
-			}
+        <div class="input-row">
+            <input type="text" id="username-input" placeholder="Enter your name">
+            <button id="update-username-button">Update Name</button>
+            <select id="gender-select">
+                <option value="boy">Boy</option>
+                <option value="girl">Girl</option>
+            </select>
+            <input type="file" id="avatar-upload" accept="image/*">
+        </div>
+    </div>
 
-			.chat-messages {
-				height: 400px;
-				overflow-y: auto;
-				padding: 20px;
-				background-color: var(--secondary-color);
-			}
+    <script>
+        const socket = io();
 
-			.message {
-				margin-bottom: 15px;
-				display: flex;
-				align-items: flex-start;
-			}
+        const chatWindow = document.getElementById('chat-window');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const roomNameSpan = document.getElementById('room-name');
+        const createRoomButton = document.getElementById('create-room-button');
+        const leaveRoomButton = document.getElementById('leave-room-button');
+        const roomCreation = document.getElementById('room-creation');
+        const roomNameInput = document.getElementById('room-name-input');
+        const roomTypeSelect = document.getElementById('room-type-select');
+        const roomPasswordInput = document.getElementById('room-password-input');
+        const confirmRoomButton = document.getElementById('confirm-room-button');
+        const usernameInput = document.getElementById('username-input');
+        const updateUsernameButton = document.getElementById('update-username-button');
+        const genderSelect = document.getElementById('gender-select');
+        const avatarUpload = document.getElementById('avatar-upload');
+        const emojiButton = document.getElementById('emoji-button');
 
-			.message img {
-				width: 40px;
-				height: 40px;
-				border-radius: 50%;
-				margin-right: 10px;
-				border: 2px solid var(--primary-color);
-			}
+        let currentRoom = 'General';
+        let username = `User_${Math.floor(Math.random() * 1000)}`;
+        let gender = 'boy';
+        let avatar = '';
 
-			.message-content {
-				background-color: var(--message-bg);
-				padding: 12px;
-				border-radius: 18px;
-				max-width: 70%;
-				box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-			}
+        socket.on('connect', () => {
+            socket.emit('user_info', { username, gender, avatar });
+        });
 
-			.message-username {
-				font-weight: bold;
-				margin-bottom: 5px;
-				color: var(--primary-dark);
-			}
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.emit('send_message', {
+                    message,
+                    time: new Date().toLocaleTimeString(),
+                    room: currentRoom
+                });
+                messageInput.value = '';
+            }
+        });
 
-			.chat-input {
-				display: flex;
-				padding: 20px;
-				background-color: white;
-				border-top: 1px solid var(--secondary-color);
-			}
+        createRoomButton.addEventListener('click', () => {
+            roomCreation.style.display = 'block';
+        });
 
-			#message-input,
-			#username-input {
-				flex-grow: 1;
-				padding: 12px;
-				border: 1px solid var(--secondary-color);
-				border-radius: 25px;
-				margin-right: 10px;
-				font-size: 16px;
-			}
+        confirmRoomButton.addEventListener('click', () => {
+            const roomName = roomNameInput.value.trim();
+            const roomType = roomTypeSelect.value;
+            const password = roomType === 'private' ? roomPasswordInput.value : null;
 
-			#send-button,
-			#update-username-button {
-				background-color: var(--primary-color);
-				color: white;
-				border: none;
-				padding: 12px 20px;
-				border-radius: 25px;
-				cursor: pointer;
-				font-size: 16px;
-				transition: background-color 0.3s ease;
-			}
+            if (roomName) {
+                socket.emit('create_room', { room_name: roomName, private: roomType === 'private', password });
+                roomCreation.style.display = 'none';
+            }
+        });
 
-			#send-button:hover,
-			#update-username-button:hover {
-				background-color: var(--primary-dark);
-			}
+        leaveRoomButton.addEventListener('click', () => {
+            socket.emit('leave_room', { room_name: currentRoom });
+        });
 
-			.username-container {
-				display: flex;
-				padding: 15px 20px;
-				background-color: var(--secondary-color);
-				align-items: center;
-			}
+        roomTypeSelect.addEventListener('change', () => {
+            roomPasswordInput.style.display = roomTypeSelect.value === 'private' ? 'inline-block' : 'none';
+        });
 
-			#current-username {
-				margin-right: 10px;
-				font-weight: bold;
-				color: var(--primary-dark);
-			}
+        updateUsernameButton.addEventListener('click', () => {
+            username = usernameInput.value.trim();
+            gender = genderSelect.value;
+            avatar = avatarUpload.files[0] ? URL.createObjectURL(avatarUpload.files[0]) : '';
+            socket.emit('user_info', { username, gender, avatar });
+        });
 
-			.system-message {
-				text-align: center;
-				font-style: italic;
-				color: var(--system-message-color);
-				margin: 10px 0;
-			}
+        socket.on('new_message', data => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `<span class="username">${data.username}</span> <span class="time">${data.time}</span>: ${data.message}`;
+            chatWindow.appendChild(messageDiv);
+        });
 
-			.message.sent {
-				flex-direction: row-reverse;
-			}
-
-			.message.sent .message-content {
-				background-color: var(--primary-color);
-				color: white;
-				margin-left: 10px;
-				margin-right: 0;
-			}
-
-			.message.sent .message-username {
-				text-align: right;
-				color: white;
-			}
-
-			.message.sent img {
-				margin-right: 0;
-				margin-left: 10px;
-			}
-		</style>
-	</head>
-	<body>
-		<div class="chat-container">
-			<div class="chat-header">Python Chat</div>
-			<div class="username-container">
-				<span id="current-username"></span>
-				<input type="text" id="username-input" placeholder="New username" />
-				<button id="update-username-button">Update Username</button>
-			</div>
-			<div class="chat-messages" id="chat-messages"></div>
-			<div class="chat-input">
-				<input type="text" id="message-input" placeholder="Type your message..." />
-				<button id="send-button">Send</button>
-			</div>
-		</div>
-
-		<script>
-			const socket = io();
-			const chatMessages = document.getElementById("chat-messages");
-			const messageInput = document.getElementById("message-input");
-			const sendButton = document.getElementById("send-button");
-			const currentUsernameSpan = document.getElementById("current-username");
-			const usernameInput = document.getElementById("username-input");
-			const updateUsernameButton = document.getElementById("update-username-button");
-
-			let currentUsername = "";
-
-			socket.on("set_username", (data) => {
-				currentUsername = data.username;
-				currentUsernameSpan.textContent = `Your username: ${currentUsername}`;
-			});
-
-			socket.on("user_joined", (data) => {
-				addMessage(`${data.username} joined the chat`, "system");
-			});
-
-			socket.on("user_left", (data) => {
-				addMessage(`${data.username} left the chat`, "system");
-			});
-
-			socket.on("new_message", (data) => {
-				addMessage(data.message, "user", data.username, data.avatar);
-			});
-
-			socket.on("username_updated", (data) => {
-				addMessage(`${data.old_username} changed their name to ${data.new_username}`, "system");
-				if (data.old_username === currentUsername) {
-					currentUsername = data.new_username;
-					currentUsernameSpan.textContent = `Your username: ${currentUsername}`;
-				}
-			});
-
-			sendButton.addEventListener("click", sendMessage);
-			messageInput.addEventListener("keypress", (e) => {
-				if (e.key === "Enter") sendMessage();
-			});
-
-			updateUsernameButton.addEventListener("click", updateUsername);
-
-			function sendMessage() {
-				const message = messageInput.value.trim();
-				if (message) {
-					socket.emit("send_message", { message });
-					messageInput.value = "";
-				}
-			}
-
-			function updateUsername() {
-				const newUsername = usernameInput.value.trim();
-				if (newUsername && newUsername !== currentUsername) {
-					socket.emit("update_username", { username: newUsername });
-					usernameInput.value = "";
-				}
-			}
-
-			function addMessage(message, type, username = "", avatar = "") {
-				const messageElement = document.createElement("div");
-				messageElement.className = "message";
-
-				if (type === "user") {
-					const isSentMessage = username === currentUsername;
-					if (isSentMessage) {
-						messageElement.classList.add("sent");
-					}
-
-					const avatarImg = document.createElement("img");
-					avatarImg.src = avatar;
-					messageElement.appendChild(avatarImg);
-
-					const contentDiv = document.createElement("div");
-					contentDiv.className = "message-content";
-
-					const usernameDiv = document.createElement("div");
-					usernameDiv.className = "message-username";
-					usernameDiv.textContent = username;
-					contentDiv.appendChild(usernameDiv);
-
-					const messageText = document.createElement("div");
-					messageText.textContent = message;
-					contentDiv.appendChild(messageText);
-
-					messageElement.appendChild(contentDiv);
-				} else {
-					messageElement.className = "system-message";
-					messageElement.textContent = message;
-				}
-				chatMessages.appendChild(messageElement);
-				chatMessages.scrollTop = chatMessages.scrollHeight;
-			}
-		</script>
-	</body>
+        emojiButton.addEventListener('click', () => {
+            messageInput.value += '😀';
+        });
+    </script>
+</body>
 </html>

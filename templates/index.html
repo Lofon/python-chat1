@@ -1,10 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Python Chat App</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js" integrity="sha512-luMnTJZ7oEchNDZAtQhgjomP1eZefnl82ruTH/3Oj/Yu5qYtwL7+dVRccACS/Snp1lFXq188XFipHKYE75IaQQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"
+        integrity="sha512-luMnTJZ7oEchNDZAtQhgjomP1eZefnl82ruTH/3Oj/Yu5qYtwL7+dVRccACS/Snp1lFXq188XFipHKYE75IaQQ=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@widgetbot/html-emoji-picker@0.1.1/dist/emoji-picker.js"></script>
+
     <style>
         :root {
             --primary-color: #4a90e2;
@@ -78,6 +83,12 @@
             color: var(--primary-dark);
         }
 
+        .message-timestamp {
+            font-size: 12px;
+            color: black;
+            margin-left: 10px;
+        }
+
         .chat-input {
             display: flex;
             padding: 20px;
@@ -96,7 +107,8 @@
         }
 
         #send-button,
-        #update-username-button {
+        #update-username-button,
+        #update-gender-button {
             background-color: var(--primary-color);
             color: white;
             border: none;
@@ -108,7 +120,8 @@
         }
 
         #send-button:hover,
-        #update-username-button:hover {
+        #update-username-button:hover,
+        #update-gender-button:hover {
             background-color: var(--primary-dark);
         }
 
@@ -152,6 +165,28 @@
             margin-right: 0;
             margin-left: 10px;
         }
+
+        #emoji-picker {
+            margin-left: 10px;
+            cursor: pointer;
+        }
+
+        .gender-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .gender-button:hover {
+            background-color: var(--primary-dark);
+        }
     </style>
 </head>
 <body>
@@ -159,32 +194,19 @@
         <div class="chat-header">Python Chat</div>
         <div class="username-container">
             <span id="current-username"></span>
-            <input type="text" id="username-input" placeholder="New username">
+            <input type="text" id="username-input" placeholder="New username" />
             <button id="update-username-button">Update Username</button>
+            <button id="update-gender-button">Update Gender</button>
+            <div id="gender-buttons">
+                <button class="gender-button" data-gender="boy">Boy</button>
+                <button class="gender-button" data-gender="girl">Girl</button>
+            </div>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input">
-            <input type="text" id="message-input" placeholder="Type your message...">
+            <input type="text" id="message-input" placeholder="Type your message..." />
+            <emoji-picker id="emoji-picker"></emoji-picker>
             <button id="send-button">Send</button>
-        </div>
-        <div id="room-controls">
-            <input type="text" id="room-name-input" placeholder="Room name">
-            <input type="password" id="room-password-input" placeholder="Room password (for private rooms)">
-            <button id="create-room-button">Create Room</button>
-            <button id="join-room-button">Join Room</button>
-            <div id="room-list"></div>
-        </div>
-        <div id="emoji-picker">
-            <span>😀</span>
-            <span>😂</span>
-            <span>😍</span>
-	            <!-- Thêm danh sách emoji -->
-            <div id="emoji-picker">
-                <span>😀</span>
-                <span>😂</span>
-                <span>😍</span>
-                <!-- Thêm các emoji khác ở đây -->
-            </div>
         </div>
     </div>
 
@@ -196,23 +218,13 @@
         const currentUsernameSpan = document.getElementById("current-username");
         const usernameInput = document.getElementById("username-input");
         const updateUsernameButton = document.getElementById("update-username-button");
-        const roomNameInput = document.getElementById("room-name-input");
-        const roomPasswordInput = document.getElementById("room-password-input");
-        const createRoomButton = document.getElementById("create-room-button");
-        const joinRoomButton = document.getElementById("join-room-button");
-        const roomList = document.getElementById("room-list");
+        const updateGenderButton = document.getElementById("update-gender-button");
+        const genderButtons = document.querySelectorAll('.gender-button');
         const emojiPicker = document.getElementById("emoji-picker");
 
         let currentUsername = "";
-        let currentRoom = "";
 
-        socket.on("prompt_user_info", () => {
-            const username = prompt("Enter your username");
-            const gender = prompt("Enter your gender (boy/girl)");
-            socket.emit("user_info", { username, gender });
-        });
-
-        socket.on("set_username", (data) => {
+        socket.on("set_user_info", (data) => {
             currentUsername = data.username;
             currentUsernameSpan.textContent = `Your username: ${currentUsername}`;
         });
@@ -226,7 +238,7 @@
         });
 
         socket.on("new_message", (data) => {
-            addMessage(data.message, "user", data.username, data.avatar, data.time);
+            addMessage(data.message, "user", data.username, data.avatar, data.timestamp);
         });
 
         socket.on("username_updated", (data) => {
@@ -237,17 +249,8 @@
             }
         });
 
-        socket.on("room_created", (data) => {
-            addRoomToList(data.room_name);
-        });
-
-        socket.on("room_joined", (data) => {
-            currentRoom = data.room_name;
-            addMessage(`You joined room ${currentRoom}`, "system");
-        });
-
-        socket.on("join_error", (data) => {
-            alert(data.error);
+        socket.on("gender_updated", (data) => {
+            addMessage(`${data.username} updated their gender`, "system");
         });
 
         sendButton.addEventListener("click", sendMessage);
@@ -256,15 +259,20 @@
         });
 
         updateUsernameButton.addEventListener("click", updateUsername);
-        createRoomButton.addEventListener("click", createRoom);
-        joinRoomButton.addEventListener("click", joinRoom);
-        emojiPicker.addEventListener("click", pickEmoji);
+
+        genderButtons.forEach(button => {
+            button.addEventListener('click', updateGender);
+        });
+
+        emojiPicker.addEventListener("emoji-click", event => {
+            const emoji = event.detail.emoji.unicode;
+            messageInput.value += emoji;
+        });
 
         function sendMessage() {
             const message = messageInput.value.trim();
             if (message) {
-                const time = new Date().toLocaleTimeString();
-                socket.emit("send_message", { message, time, room: currentRoom });
+                socket.emit("send_message", { message });
                 messageInput.value = "";
             }
         }
@@ -277,34 +285,12 @@
             }
         }
 
-        function createRoom() {
-            const roomName = roomNameInput.value.trim();
-            const password = roomPasswordInput.value.trim();
-            const isPrivate = password.length === 6;
-            socket.emit("create_room", { room_name: roomName, private: isPrivate, password });
+        function updateGender(event) {
+            const gender = event.target.getAttribute("data-gender");
+            socket.emit("update_gender", { gender });
         }
 
-        function joinRoom() {
-            const roomName = prompt("Enter room name to join");
-            const password = prompt("Enter room password (leave blank if not required)");
-            socket.emit("join_room", { room_name: roomName, password });
-        }
-
-        function addRoomToList(roomName) {
-            const roomElement = document.createElement("div");
-            roomElement.textContent = roomName;
-            roomElement.addEventListener("click", () => joinRoom(roomName));
-            roomList.appendChild(roomElement);
-        }
-
-        function pickEmoji(event) {
-            if (event.target.tagName === "SPAN") {
-                messageInput.value += event.target.textContent;
-                messageInput.focus();
-            }
-        }
-
-        function addMessage(message, type, username = "", avatar = "", time = "") {
+        function addMessage(message, type, username = "", avatar = "", timestamp = "") {
             const messageElement = document.createElement("div");
             messageElement.className = "message";
 
@@ -330,12 +316,10 @@
                 messageText.textContent = message;
                 contentDiv.appendChild(messageText);
 
-                if (time) {
-                    const timeDiv = document.createElement("div");
-                    timeDiv.className = "message-time";
-                    timeDiv.textContent = time;
-                    contentDiv.appendChild(timeDiv);
-                }
+                const timestampDiv = document.createElement("div");
+                timestampDiv.className = "message-timestamp";
+                timestampDiv.textContent = timestamp;
+                contentDiv.appendChild(timestampDiv);
 
                 messageElement.appendChild(contentDiv);
             } else {
@@ -348,3 +332,4 @@
     </script>
 </body>
 </html>
+

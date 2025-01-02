@@ -29,6 +29,7 @@ def handle_set_username_gender(data):
 
     emit("user_joined", {"username": username, "avatar": avatar_url}, broadcast=True)
     emit("set_username", {"username": username})
+    emit("room_list", {"rooms": list(rooms.keys())}, broadcast=True)
 
 @socketio.on("disconnect")
 def handle_disconnect():
@@ -65,6 +66,7 @@ def handle_create_room(data):
     password = data.get("password")
     rooms[room_name] = {"password": password, "members": []}
     emit("room_created", {"room_name": room_name}, broadcast=True)
+    emit("room_list", {"rooms": list(rooms.keys())}, broadcast=True)
 
 @socketio.on("join_room")
 def handle_join_room(data):
@@ -76,6 +78,7 @@ def handle_join_room(data):
         join_room(room_name)
         room["members"].append(request.sid)
         emit("joined_room", {"room_name": room_name, "username": users[request.sid]["username"]}, room=room_name)
+        emit("room_list", {"rooms": list(rooms.keys())}, room=request.sid)
     else:
         emit("join_error", {"message": "Incorrect password or room does not exist"})
 
@@ -88,6 +91,7 @@ def handle_leave_room(data):
         leave_room(room_name)
         room["members"].remove(request.sid)
         emit("left_room", {"room_name": room_name, "username": users[request.sid]["username"]}, room=room_name)
+        emit("room_list", {"rooms": list(rooms.keys())}, room=request.sid)
 
 if __name__ == "__main__":
     socketio.run(app)

@@ -5,11 +5,9 @@ import random
 app = Flask(__name__)
 socketio = SocketIO(app)
 
-# Python dict để lưu trữ người dùng kết nối. Key là socket id, giá trị là username, avatarUrl, gender
+# python dict. Store connected users. Key is socket id, value is username and avatarUrl 
 users = {}
-
-# Python dict để lưu trữ các phòng chat. Key là room name, giá trị là danh sách người dùng
-rooms = {}
+rooms = {}  # Stores room info
 
 @app.route('/')
 def index():
@@ -17,27 +15,22 @@ def index():
 
 @socketio.on("connect")
 def handle_connect():
-    emit("request_username")
+    emit("prompt_user_info")
 
-@socketio.on("set_user_info")
-def handle_set_user_info(data):
-    users[request.sid] = { 
-        "username": data["username"],
-        "avatar": f"https://avatar.iran.liara.run/public/{data['gender']}?username={data['username']}",
-        "gender": data["gender"]
-    }
-    emit("user_joined", {"username": data["username"], "avatar": users[request.sid]["avatar"]}, broadcast=True)
-    emit("set_username", {"username": data["username"]})
+@socketio.on("user_info")
+def handle_user_info(data):
+    username = data["username"]
+    gender = data["gender"]
+    avatar_url = f"https://avatar.iran.liara.run/public/{gender}?username={username}"
+    users[request.sid] = {"username": username, "avatar": avatar_url}
+    emit("user_joined", {"username": username, "avatar": avatar_url}, broadcast=True)
+    emit("set_username", {"username": username})
 
 @socketio.on("disconnect")
 def handle_disconnect():
     user = users.pop(request.sid, None)
     if user:
         emit("user_left", {"username": user["username"]}, broadcast=True)
-        for room in rooms.values():
-            if user["username"] in room:
-                room.remove(user["username"])
-                break
 
 @socketio.on("send_message")
 def handle_message(data):
@@ -47,7 +40,7 @@ def handle_message(data):
             "username": user["username"],
             "avatar": user["avatar"],
             "message": data["message"],
-            "timestamp": data["timestamp"]
+            "time": data["time"]
         }, room=data["room"])
 
 @socketio.on("update_username")
@@ -63,24 +56,34 @@ def handle_update_username(data):
 @socketio.on("create_room")
 def handle_create_room(data):
     room_name = data["room_name"]
-    if room_name not in rooms:
-        rooms[room_name] = []
-        if data["private"]:
-            rooms[room_name] = data["password"]
-        emit("room_created", {"room_name": room_name, "private": data["private"]}, broadcast=True)
+    private = data["private"]
+    password = data["password"] if private else None
+    rooms[room_name] = {"private": private, "password": password, "users": []}
+    emit("room_created", {"room_name": room_name})
 
 @socketio.on("join_room")
 def handle_join_room(data):
     room_name = data["room_name"]
-    password = data.get("password")
-    if room_name in rooms:
-        if isinstance(rooms[room_name], list) or rooms[room_name] == password:
-            users[request.sid]["room"] = room_name
-            rooms[room_name].append(users[request.sid]["username"])
-            emit("room_joined", {"room_name": room_name}, room=room_name)
-            socketio.enter_room(request.sid, room_name)
+    room = rooms.get(room_name)
+    if room:
+        if room["private"] and room["password"] != data["password"]:
+            emit("join_error", {"error": "Incorrect password"})
         else:
-            emit("join_failed", {"message": "Incorrect password"})
+            rooms[room_name]["users"].append(request.sid)
+            join_room(room_name)
+            emit("room_joined", {"room_name": room_name})
+            emit("user_joined_room", {"username": users[request.sid]["username"]}, room=room_name)
+    else:
+        emit("join_error", {"error": "Room not found"})
+
+@socketio.on("leave_room")
+def handle_leave_room(data):
+    room_name = data["room_name"]
+    if room_name in rooms:
+        rooms[room_name]["users"].remove(request.sid)
+        leave_room(room_name)
+        emit("room_left", {"room_name": room_name})
+        emit("user_left_room", {"username": users[request.sid]["username"]}, room=room_name)
 
 if __name__ == "__main__":
     socketio.run(app)

@@ -73,7 +73,7 @@
             background-color: var(--message-bg);
             padding: 12px;
             border-radius: 18px;
-            max-width: 70%;
+	            max-width: 70%;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
         }
 
@@ -187,6 +187,10 @@
         .gender-button:hover {
             background-color: var(--primary-dark);
         }
+
+        #gender-buttons {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -209,7 +213,6 @@
             <button id="send-button">Send</button>
         </div>
     </div>
-
     <script>
         const socket = io();
         const chatMessages = document.getElementById("chat-messages");
@@ -219,7 +222,7 @@
         const usernameInput = document.getElementById("username-input");
         const updateUsernameButton = document.getElementById("update-username-button");
         const updateGenderButton = document.getElementById("update-gender-button");
-        const genderButtons = document.querySelectorAll('.gender-button');
+        const genderButtons = document.getElementById("gender-buttons");
         const emojiPicker = document.getElementById("emoji-picker");
 
         let currentUsername = "";
@@ -260,7 +263,11 @@
 
         updateUsernameButton.addEventListener("click", updateUsername);
 
-        genderButtons.forEach(button => {
+        updateGenderButton.addEventListener("click", () => {
+            genderButtons.style.display = genderButtons.style.display === "none" ? "block" : "none";
+        });
+
+        genderButtons.querySelectorAll('.gender-button').forEach(button => {
             button.addEventListener('click', updateGender);
         });
 
@@ -288,6 +295,7 @@
         function updateGender(event) {
             const gender = event.target.getAttribute("data-gender");
             socket.emit("update_gender", { gender });
+            genderButtons.style.display = "none";
         }
 
         function addMessage(message, type, username = "", avatar = "", timestamp = "") {
@@ -332,4 +340,3 @@
     </script>
 </body>
 </html>
-

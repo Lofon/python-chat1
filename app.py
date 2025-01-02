@@ -13,7 +13,6 @@ users = {}
 def index():
     return render_template('index.html')
 
-# we're listening for the connect event
 @socketio.on("connect")
 def handle_connect():
     username = f"User_{random.randint(1000,9999)}"

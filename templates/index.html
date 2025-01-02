@@ -6,6 +6,7 @@
     <title>Python Chat App</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <style>
+        /* Thêm CSS để giữ giao diện tương tự */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -14,179 +15,93 @@
         }
         .container {
             max-width: 800px;
-            margin: 0 auto;
+            margin: auto;
             padding: 20px;
         }
-        .chat-header, .room-header {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px;
+        .chat-header {
             text-align: center;
             font-size: 24px;
+            background: #007BFF;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
         }
         .chat-window {
-            border: 1px solid #ddd;
+            height: 400px;
+            border: 1px solid #ccc;
             border-radius: 5px;
-            background: #fff;
             padding: 10px;
-            margin-top: 20px;
-            max-height: 400px;
+            background: white;
             overflow-y: auto;
-        }
-        .message {
-            margin-bottom: 15px;
-        }
-        .message .username {
-            font-weight: bold;
-            margin-right: 10px;
-        }
-        .message .time {
-            color: #aaa;
-            font-size: 0.85em;
+            margin-bottom: 10px;
         }
         .input-row {
-            margin-top: 20px;
             display: flex;
+            margin-bottom: 10px;
         }
-        .input-row input, .input-row button, select {
-            margin-right: 10px;
+        .input-row input, .input-row button {
             padding: 10px;
-            font-size: 16px;
-            border: 1px solid #ddd;
+            margin-right: 10px;
             border-radius: 5px;
+            border: 1px solid #ccc;
         }
         .input-row button {
-            background-color: #4CAF50;
+            background: #007BFF;
             color: white;
-            border: none;
             cursor: pointer;
-        }
-        .input-row button:hover {
-            background-color: #45a049;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="chat-header">Python Chat App</div>
-        
-        <div class="room-header">
-            <span id="room-name">Room: General</span>
-            <button id="create-room-button">Create Room</button>
-            <button id="leave-room-button">Leave Room</button>
-        </div>
+        <div class="chat-header">Python Chat</div>
 
-        <div id="room-creation" style="display: none;">
-            <input type="text" id="room-name-input" placeholder="Enter room name">
-            <select id="room-type-select">
-                <option value="public">Public</option>
-                <option value="private">Private</option>
+        <div id="user-setup">
+            <input type="text" id="username" placeholder="Nhập tên của bạn">
+            <select id="gender">
+                <option value="boy">Nam</option>
+                <option value="girl">Nữ</option>
             </select>
-            <input type="password" id="room-password-input" placeholder="Enter password (if private)" style="display: none;">
-            <button id="confirm-room-button">Create</button>
+            <input type="number" id="avatar-id" placeholder="Mã số avatar">
+            <button id="join-chat">Tham gia Chat</button>
         </div>
 
-        <div class="chat-window" id="chat-window">
-            <!-- Messages will appear here -->
-        </div>
-
-        <div class="input-row">
-            <input type="text" id="message-input" placeholder="Type a message">
-            <button id="send-button">Send</button>
-            <button id="emoji-button">😀</button>
-        </div>
-
-        <div class="input-row">
-            <input type="text" id="username-input" placeholder="Enter your name">
-            <button id="update-username-button">Update Name</button>
-            <select id="gender-select">
-                <option value="boy">Boy</option>
-                <option value="girl">Girl</option>
-            </select>
-            <input type="file" id="avatar-upload" accept="image/*">
+        <div id="chat-section" style="display: none;">
+            <div class="chat-window" id="chat-window"></div>
+            <div class="input-row">
+                <input type="text" id="message" placeholder="Nhập tin nhắn">
+                <button id="send">Gửi</button>
+            </div>
         </div>
     </div>
 
     <script>
         const socket = io();
-
+        const userSetup = document.getElementById('user-setup');
+        const chatSection = document.getElementById('chat-section');
         const chatWindow = document.getElementById('chat-window');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const roomNameSpan = document.getElementById('room-name');
-        const createRoomButton = document.getElementById('create-room-button');
-        const leaveRoomButton = document.getElementById('leave-room-button');
-        const roomCreation = document.getElementById('room-creation');
-        const roomNameInput = document.getElementById('room-name-input');
-        const roomTypeSelect = document.getElementById('room-type-select');
-        const roomPasswordInput = document.getElementById('room-password-input');
-        const confirmRoomButton = document.getElementById('confirm-room-button');
-        const usernameInput = document.getElementById('username-input');
-        const updateUsernameButton = document.getElementById('update-username-button');
-        const genderSelect = document.getElementById('gender-select');
-        const avatarUpload = document.getElementById('avatar-upload');
-        const emojiButton = document.getElementById('emoji-button');
+        const messageInput = document.getElementById('message');
 
-        let currentRoom = 'General';
-        let username = `User_${Math.floor(Math.random() * 1000)}`;
-        let gender = 'boy';
-        let avatar = '';
+        document.getElementById('join-chat').addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            const gender = document.getElementById('gender').value;
+            const avatarId = document.getElementById('avatar-id').value;
 
-        socket.on('connect', () => {
-            socket.emit('user_info', { username, gender, avatar });
+            socket.emit('user_info', { username, gender, avatar_id: avatarId });
+            userSetup.style.display = 'none';
+            chatSection.style.display = 'block';
         });
 
-        sendButton.addEventListener('click', () => {
-            const message = messageInput.value.trim();
-            if (message) {
-                socket.emit('send_message', {
-                    message,
-                    time: new Date().toLocaleTimeString(),
-                    room: currentRoom
-                });
-                messageInput.value = '';
-            }
-        });
-
-        createRoomButton.addEventListener('click', () => {
-            roomCreation.style.display = 'block';
-        });
-
-        confirmRoomButton.addEventListener('click', () => {
-            const roomName = roomNameInput.value.trim();
-            const roomType = roomTypeSelect.value;
-            const password = roomType === 'private' ? roomPasswordInput.value : null;
-
-            if (roomName) {
-                socket.emit('create_room', { room_name: roomName, private: roomType === 'private', password });
-                roomCreation.style.display = 'none';
-            }
-        });
-
-        leaveRoomButton.addEventListener('click', () => {
-            socket.emit('leave_room', { room_name: currentRoom });
-        });
-
-        roomTypeSelect.addEventListener('change', () => {
-            roomPasswordInput.style.display = roomTypeSelect.value === 'private' ? 'inline-block' : 'none';
-        });
-
-        updateUsernameButton.addEventListener('click', () => {
-            username = usernameInput.value.trim();
-            gender = genderSelect.value;
-            avatar = avatarUpload.files[0] ? URL.createObjectURL(avatarUpload.files[0]) : '';
-            socket.emit('user_info', { username, gender, avatar });
-        });
-
-        socket.on('new_message', data => {
+        socket.on('new_message', (data) => {
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'message';
-            messageDiv.innerHTML = `<span class="username">${data.username}</span> <span class="time">${data.time}</span>: ${data.message}`;
+            messageDiv.innerHTML = `<strong>${data.username}</strong>: ${data.message} <span style="color: gray; font-size: 0.8em;">(${data.time})</span>`;
             chatWindow.appendChild(messageDiv);
         });
 
-        emojiButton.addEventListener('click', () => {
-            messageInput.value += '😀';
+        document.getElementById('send').addEventListener('click', () => {
+            const message = messageInput.value;
+            socket.emit('send_message', { message, time: new Date().toLocaleTimeString() });
+            messageInput.value = '';
         });
     </script>
 </body>

@@ -6,7 +6,6 @@
     <title>Python Chat App</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <style>
-        /* Thêm CSS để giữ giao diện tương tự */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -15,13 +14,16 @@
         }
         .container {
             max-width: 800px;
-            margin: auto;
+            margin: 20px auto;
             padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
         }
         .chat-header {
             text-align: center;
             font-size: 24px;
-            background: #007BFF;
+            background-color: #007BFF;
             color: white;
             padding: 10px;
             border-radius: 5px;
@@ -39,14 +41,14 @@
             display: flex;
             margin-bottom: 10px;
         }
-        .input-row input, .input-row button {
+        .input-row input, .input-row button, .input-row select {
             padding: 10px;
             margin-right: 10px;
             border-radius: 5px;
             border: 1px solid #ccc;
         }
         .input-row button {
-            background: #007BFF;
+            background-color: #007BFF;
             color: white;
             cursor: pointer;
         }
@@ -55,18 +57,21 @@
 <body>
     <div class="container">
         <div class="chat-header">Python Chat</div>
-
         <div id="user-setup">
             <input type="text" id="username" placeholder="Nhập tên của bạn">
             <select id="gender">
                 <option value="boy">Nam</option>
                 <option value="girl">Nữ</option>
             </select>
-            <input type="number" id="avatar-id" placeholder="Mã số avatar">
-            <button id="join-chat">Tham gia Chat</button>
+            <button id="join-chat">Tham gia</button>
         </div>
-
         <div id="chat-section" style="display: none;">
+            <div>
+                <button id="create-room">Tạo phòng</button>
+                <button id="get-rooms">Danh sách phòng</button>
+                <button id="leave-room">Rời phòng</button>
+            </div>
+            <div id="room-list" style="margin-top: 10px;"></div>
             <div class="chat-window" id="chat-window"></div>
             <div class="input-row">
                 <input type="text" id="message" placeholder="Nhập tin nhắn">
@@ -80,28 +85,45 @@
         const userSetup = document.getElementById('user-setup');
         const chatSection = document.getElementById('chat-section');
         const chatWindow = document.getElementById('chat-window');
-        const messageInput = document.getElementById('message');
+        const roomList = document.getElementById('room-list');
 
         document.getElementById('join-chat').addEventListener('click', () => {
             const username = document.getElementById('username').value;
             const gender = document.getElementById('gender').value;
-            const avatarId = document.getElementById('avatar-id').value;
-
-            socket.emit('user_info', { username, gender, avatar_id: avatarId });
+            socket.emit('user_info', { username, gender });
             userSetup.style.display = 'none';
             chatSection.style.display = 'block';
         });
 
-        socket.on('new_message', (data) => {
-            const messageDiv = document.createElement('div');
-            messageDiv.innerHTML = `<strong>${data.username}</strong>: ${data.message} <span style="color: gray; font-size: 0.8em;">(${data.time})</span>`;
-            chatWindow.appendChild(messageDiv);
+        document.getElementById('create-room').addEventListener('click', () => {
+            const roomName = prompt("Tên phòng:");
+            const privateRoom = confirm("Phòng riêng?");
+            const password = privateRoom ? prompt("Mật khẩu (6 số):") : null;
+
+            if (roomName) {
+                socket.emit('create_room', { room_name: roomName, private: privateRoom, password });
+            }
+        });
+
+        document.getElementById('get-rooms').addEventListener('click', () => {
+            socket.emit('get_rooms');
+        });
+
+        socket.on('room_list', (data) => {
+            roomList.innerHTML = data.rooms.map(room => 
+                `<div>${room.name} (${room.private ? "Riêng tư" : "Tự do"})</div>`).join('');
         });
 
         document.getElementById('send').addEventListener('click', () => {
-            const message = messageInput.value;
-            socket.emit('send_message', { message, time: new Date().toLocaleTimeString() });
-            messageInput.value = '';
+            const message = document.getElementById('message').value;
+            socket.emit('send_message', { message });
+            document.getElementById('message').value = '';
+        });
+
+        socket.on('new_message', (data) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.innerHTML = `<strong>${data.username}</strong>: ${data.message} <span style="color: gray;">(${data.time})</span>`;
+            chatWindow.appendChild(messageDiv);
         });
     </script>
 </body>

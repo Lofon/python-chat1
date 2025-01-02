@@ -6,7 +6,7 @@ from datetime import datetime
 app = Flask(__name__)
 socketio = SocketIO(app)
 
-# python dict. Store rooms and users
+# python dict to store rooms and users
 rooms = {}
 
 @app.route('/')
@@ -91,10 +91,26 @@ def handle_update_username(data):
                 "new_username": new_username
             }, room=request.sid)
 
+@socketio.on("update_room_name")
+def handle_update_room_name(data):
+    room_id = data["room_id"]
+    new_room_name = data["new_room_name"]
+    if room_id in rooms:
+        rooms[room_id]["room_name"] = new_room_name
+        emit("room_name_updated", {"room_id": room_id, "new_room_name": new_room_name}, room=room_id)
+
+@socketio.on("update_room_password")
+def handle_update_room_password(data):
+    room_id = data["room_id"]
+    new_password = data["new_password"]
+    if room_id in rooms and rooms[room_id]["room_type"] == "private":
+        rooms[room_id]["room_password"] = new_password
+        emit("room_password_updated", {"room_id": room_id}, room=room_id)
+
 @socketio.on("get_rooms")
 def handle_get_rooms():
     available_rooms = [
-        {"room_id": room_id, "room_name": room["room_name"]}
+        {"room_id": room_id, "room_name": room["room_name"], "room_type": room["room_type"]}
         for room_id, room in rooms.items()
     ]
     emit("rooms_list", {"rooms": available_rooms})

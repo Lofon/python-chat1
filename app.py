@@ -2,8 +2,9 @@ from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
-app = Flask(__name__) 
+app = Flask(__name__)
 socketio = SocketIO(app)
 
 # Dictionary to store rooms and users
@@ -15,14 +16,17 @@ def index():
 
 @socketio.on("connect")
 def handle_connect():
-    username = f"User_{random.randint(1000,9999)}"
-    gender = random.choice(["girl", "boy"])
-    avatar_url = f"https://avatar.iran.liara.run/public/{gender}?username={username}"
-    emit("set_user_info", {"username": username, "gender": gender})
+    session_id = request.sid
+    print(f"New connection: {session_id}")
+
+@socketio.on("set_username")
+def set_username(data):
+    username = data["username"]
+    emit("set_user_info", {"username": username})
 
 @socketio.on("create_room")
 def handle_create_room(data):
-    room_id = f"Room_{random.randint(1000,9999)}"
+    room_id = f"Room_{random.randint(1000, 9999)}"
     room_name = data["room_name"]
     room_type = data["room_type"]
     room_password = data.get("room_password", None)
@@ -30,7 +34,7 @@ def handle_create_room(data):
     rooms[room_id] = {
         "room_name": room_name,
         "room_type": room_type,
-        "room_password": room_password if room_type == "private" else None,
+        "room_password": generate_password_hash(room_password) if room_password else None,
         "users": {}
     }
 
@@ -44,7 +48,7 @@ def handle_join_room(data):
 
     if room_id in rooms:
         room = rooms[room_id]
-        if room["room_type"] == "private" and room["room_password"] != password:
+        if room["room_type"] == "private" and not check_password_hash(room["room_password"], password):
             emit("join_error", {"error": "Invalid password"})
             return
 
@@ -95,7 +99,7 @@ def handle_update_room_password(data):
     room_id = data["room_id"]
     new_password = data["new_password"]
     if room_id in rooms and rooms[room_id]["room_type"] == "private":
-        rooms[room_id]["room_password"] = new_password
+        rooms[room_id]["room_password"] = generate_password_hash(new_password)
         emit("room_password_updated", {"room_id": room_id})
 
 @socketio.on("get_room_users")

@@ -3,10 +3,10 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__) 
 socketio = SocketIO(app)
 
-# python dict to store rooms and users
+# Dictionary to store rooms and users
 rooms = {}
 
 @app.route('/')
@@ -18,7 +18,6 @@ def handle_connect():
     username = f"User_{random.randint(1000,9999)}"
     gender = random.choice(["girl", "boy"])
     avatar_url = f"https://avatar.iran.liara.run/public/{gender}?username={username}"
-
     emit("set_user_info", {"username": username, "gender": gender})
 
 @socketio.on("create_room")
@@ -31,7 +30,7 @@ def handle_create_room(data):
     rooms[room_id] = {
         "room_name": room_name,
         "room_type": room_type,
-        "room_password": room_password,
+        "room_password": room_password if room_type == "private" else None,
         "users": {}
     }
 
@@ -51,7 +50,7 @@ def handle_join_room(data):
 
         join_room(room_id)
         room["users"][request.sid] = username
-        emit("room_joined", {"room_id": room_id, "room_name": room["room_name"]})
+        emit("room_joined", {"room_id": room_id, "room_name": room["room_name"], "users": list(room["users"].values())})
         emit("user_joined_room", {"username": username}, room=room_id)
 
 @socketio.on("leave_room")
@@ -91,21 +90,20 @@ def handle_update_username(data):
                 "new_username": new_username
             }, room=request.sid)
 
-@socketio.on("update_room_name")
-def handle_update_room_name(data):
-    room_id = data["room_id"]
-    new_room_name = data["new_room_name"]
-    if room_id in rooms:
-        rooms[room_id]["room_name"] = new_room_name
-        emit("room_name_updated", {"room_id": room_id, "new_room_name": new_room_name}, room=room_id)
-
 @socketio.on("update_room_password")
 def handle_update_room_password(data):
     room_id = data["room_id"]
     new_password = data["new_password"]
     if room_id in rooms and rooms[room_id]["room_type"] == "private":
         rooms[room_id]["room_password"] = new_password
-        emit("room_password_updated", {"room_id": room_id}, room=room_id)
+        emit("room_password_updated", {"room_id": room_id})
+
+@socketio.on("get_room_users")
+def handle_get_room_users(data):
+    room_id = data["room_id"]
+    if room_id in rooms:
+        users = list(rooms[room_id]["users"].values())
+        emit("room_users", {"room_id": room_id, "users": users})
 
 @socketio.on("get_rooms")
 def handle_get_rooms():

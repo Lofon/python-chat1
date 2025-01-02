@@ -1,12 +1,13 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
+import datetime
 
 app = Flask(__name__)
 socketio = SocketIO(app)
 
 # Lưu trữ thông tin người dùng và phòng chat
-users = {}  # socket_id: {username, gender, avatar}
+users = {}  # socket_id: {username, gender, room}
 rooms = {}  # room_name: {password, private, users (list of socket_ids)}
 
 @app.route('/')
@@ -16,44 +17,45 @@ def index():
 # Khi người dùng kết nối
 @socketio.on("connect")
 def handle_connect():
-    emit("request_user_info")  # Gửi yêu cầu cung cấp thông tin người dùng
+    emit("request_user_info")  # Yêu cầu người dùng nhập thông tin
 
 # Khi người dùng gửi thông tin
 @socketio.on("user_info")
 def handle_user_info(data):
     username = data["username"]
     gender = data["gender"]
-    avatar_id = data["avatar_id"]
-    avatar_url = f"https://avatar.iran.liara.run/public/{gender}?username={username}"
-    
     users[request.sid] = {
         "username": username,
         "gender": gender,
-        "avatar": avatar_url
+        "room": None
     }
-
-    emit("user_joined", {"username": username, "avatar": avatar_url}, broadcast=True)
+    emit("user_joined", {"username": username}, broadcast=True)
 
 # Khi người dùng ngắt kết nối
 @socketio.on("disconnect")
 def handle_disconnect():
     user = users.pop(request.sid, None)
-    if user:
-        emit("user_left", {"username": user["username"]}, broadcast=True)
+    if user and user["room"]:
+        room_name = user["room"]
+        rooms[room_name]["users"].remove(request.sid)
+        emit("user_left_room", {"username": user["username"]}, room=room_name)
+        if not rooms[room_name]["users"]:  # Xóa room nếu không còn ai
+            del rooms[room_name]
 
-# Khi người dùng gửi tin nhắn
+# Gửi tin nhắn
 @socketio.on("send_message")
 def handle_message(data):
     user = users.get(request.sid)
-    if user:
+    if user and user["room"]:
+        room_name = user["room"]
+        time = datetime.datetime.now().strftime("%H:%M:%S")
         emit("new_message", {
             "username": user["username"],
-            "avatar": user["avatar"],
             "message": data["message"],
-            "time": data["time"]
-        }, room=data["room"])
+            "time": time
+        }, room=room_name)
 
-# Khi người dùng tạo phòng chat
+# Tạo phòng chat
 @socketio.on("create_room")
 def handle_create_room(data):
     room_name = data["room_name"]
@@ -68,7 +70,7 @@ def handle_create_room(data):
         }
         emit("room_created", {"room_name": room_name}, broadcast=True)
 
-# Khi người dùng tham gia phòng chat
+# Tham gia phòng chat
 @socketio.on("join_room")
 def handle_join_room(data):
     room_name = data["room_name"]
@@ -80,11 +82,12 @@ def handle_join_room(data):
             emit("join_failed", {"reason": "Sai mật khẩu"})
         else:
             room["users"].append(request.sid)
+            users[request.sid]["room"] = room_name
             join_room(room_name)
             emit("joined_room", {"room_name": room_name}, room=request.sid)
             emit("user_joined_room", {"username": users[request.sid]["username"]}, room=room_name)
 
-# Khi người dùng rời phòng chat
+# Rời phòng chat
 @socketio.on("leave_room")
 def handle_leave_room(data):
     room_name = data["room_name"]
@@ -93,8 +96,15 @@ def handle_leave_room(data):
         room = rooms[room_name]
         if request.sid in room["users"]:
             room["users"].remove(request.sid)
+            users[request.sid]["room"] = None
             leave_room(room_name)
             emit("user_left_room", {"username": users[request.sid]["username"]}, room=room_name)
+
+# Lấy danh sách phòng
+@socketio.on("get_rooms")
+def handle_get_rooms():
+    room_list = [{"name": room, "private": info["private"]} for room, info in rooms.items()]
+    emit("room_list", {"rooms": room_list})
 
 if __name__ == "__main__":
     socketio.run(app)

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Python Chat App</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"
-        integrity="sha512-luMnTJZ7oEchNDZAtQhgjomP1eZefnl82ruTH/3Oj/Yu5qYtwL7+dVRccACS/Snp1lFXq188XFipHKYE75IaQQ=="
+        integrity="sha512-luMnTJZ7oEchNDZAtQhgjomP1eZefnl82ruTH/3Oj/YtwL7+dVRccACS/Snp1lFXq188XFipHKYE75IaQQ=="
         crossorigin="anonymous" referrerpolicy="no-referrer">
     </script>
     <style>
@@ -156,7 +156,7 @@
             background-color: var(--primary-color);
             color: white;
             border: none;
-            padding: 12px 20px;
+                        padding: 12px 20px;
             border-radius: 25px;
             cursor: pointer;
             font-size: 16px;
@@ -164,6 +164,29 @@
         }
         #create-room-button:hover, #join-room-button:hover, #leave-room-button:hover {
             background-color: var(--primary-dark);
+        }
+        .room-list {
+            padding: 20px;
+            background-color: var(--secondary-color);
+        }
+        .room-list h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        .room-list ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .room-list li {
+            padding: 10px;
+            background-color: white;
+            border: 1px solid var(--primary-color);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        .room-list li:hover {
+            background-color: var(--primary-light);
         }
     </style>
 </head>
@@ -187,6 +210,10 @@
             <button id="join-room-button">Join Room</button>
             <button id="leave-room-button">Leave Room</button>
         </div>
+        <div class="room-list">
+            <h3>Available Rooms:</h3>
+            <ul id="room-list"></ul>
+        </div>
     </div>
 
     <script>
@@ -202,6 +229,7 @@
         const createRoomButton = document.getElementById("create-room-button");
         const joinRoomButton = document.getElementById("join-room-button");
         const leaveRoomButton = document.getElementById("leave-room-button");
+        const roomList = document.getElementById("room-list");
 
         let currentUsername = "";
         let currentRoom = "";
@@ -257,6 +285,10 @@
             addMessage(`${data.username} left the room ${data.room_name}`, "system");
         });
 
+        socket.on("room_list", (data) => {
+            updateRoomList(data.rooms);
+        });
+
         sendButton.addEventListener("click", sendMessage);
         messageInput.addEventListener("keypress", (e) => {
             if (e.key === "Enter") sendMessage();
@@ -305,6 +337,19 @@
             if (currentRoom) {
                 socket.emit("leave_room", { room_name: currentRoom });
             }
+        }
+
+        function updateRoomList(rooms) {
+            roomList.innerHTML = "";
+            rooms.forEach(room => {
+                const roomElement = document.createElement("li");
+                roomElement.textContent = room;
+                roomElement.addEventListener("click", () => {
+                    const password = prompt("Enter room password (leave blank for none):");
+                    socket.emit("join_room", { room_name: room, password: password || null });
+                });
+                roomList.appendChild(roomElement);
+            });
         }
 
         function addMessage(message, type, username = "", avatar = "", timestamp = "") {

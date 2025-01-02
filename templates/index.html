@@ -88,6 +88,27 @@
             margin-left: 10px;
         }
 
+        .message.sent {
+            flex-direction: row-reverse;
+        }
+
+        .message.sent .message-content {
+            background-color: var(--primary-color);
+            color: white;
+            margin-left: 10px;
+            margin-right: 0;
+        }
+
+        .message.sent .message-username {
+            text-align: right;
+            color: white;
+        }
+
+        .message.sent img {
+            margin-right: 0;
+            margin-left: 10px;
+        }
+
         .chat-input {
             display: flex;
             padding: 20px;
@@ -98,7 +119,7 @@
         #message-input,
         #username-input,
         #room-name-input,
-        #password-input {
+        #room-password-input {
             flex-grow: 1;
             padding: 12px;
             border: 1px solid var(--secondary-color);
@@ -119,7 +140,7 @@
             padding: 12px 20px;
             border-radius: 25px;
             cursor: pointer;
-            font-size: 16px;
+                        font-size: 16px;
             transition: background-color 0.3s ease;
         }
 
@@ -132,45 +153,11 @@
             background-color: var(--primary-dark);
         }
 
-        .username-container {
-            display: flex;
-            padding: 15px 20px;
-            background-color: var(--secondary-color);
-            align-items: center;
-        }
-
-        #current-username {
-            margin-right: 10px;
-            font-weight: bold;
-            color: var(--primary-dark);
-        }
-
         .system-message {
             text-align: center;
             font-style: italic;
             color: var(--system-message-color);
             margin: 10px 0;
-        }
-
-        .message.sent {
-            flex-direction: row-reverse;
-        }
-
-        .message.sent .message-content {
-            background-color: var(--primary-color);
-            color: white;
-            margin-left: 10px;
-            margin-right: 0;
-        }
-
-        .message.sent .message-username {
-            text-align: right;
-            color: white;
-        }
-
-        .message.sent img {
-            margin-right: 0;
-            margin-left: 10px;
         }
 
         #emoji-picker {
@@ -329,155 +316,149 @@
             currentUsernameSpan.textContent = `Your username: ${currentUsername}`;
         });
 
-        socket.on("user_joined", (data) => {
-            addMessage(`${data.username} joined the chat`, "system");
-        });
-
-        socket.on("user_left", (data) => {
-            addMessage(`${data.username} left the chat`, "system");
-        });
-
-        socket.on("new_message", (data) => {
-            addMessage(data.message, "user", data.username, data.avatar, data.timestamp);
-        });
-
-        socket.on("username_updated", (data) => {
-            addMessage(`${data.old_username} changed their name to ${data.new_username}`, "system");
-            if (data.old_username === currentUsername) {
-                currentUsername = data.new_username;
-                currentUsernameSpan.textContent = `Your username: ${currentUsername}`;
-            }
-        });
-
-        socket.on("gender_updated", (data) => {
-            addMessage(`${data.username} updated their gender`, "system");
-        });
-
         socket.on("room_created", (data) => {
-            alert(`Room created with ID: ${data.room_id}`);
-            currentRoomId = data.room_id;
-            roomContainer.style.display = "none";
-        });
-
-        socket.on("rooms_list", (data) => {
-            roomsList.innerHTML = "";
-            data.rooms.forEach(room => {
-                const li = document.createElement("li");
-                li.innerHTML = `Room Name: ${room.room_name}, Room ID: ${room.room_id} <button class="room-button" data-room-id="${room.room_id}" data-room-type="${room.room_type}">Join</button>`;
-                roomsList.appendChild(li);
-            });
+            console.log('Room created:', data.room_name);
+            alert(`Room created: ${data.room_name}`);
         });
 
         socket.on("room_joined", (data) => {
+            console.log('Joined room:', data.room_name);
             alert(`Joined room: ${data.room_name}`);
-            currentRoomId = data.room_id;
-            joinRoomContainer.style.display = "none";
-        });
-        socket.on("join_error", (data) => {
-            alert(`Error: ${data.error}`);
         });
 
-        sendButton.addEventListener("click", () => {
+        socket.on("new_message", (data) => {
+            const messageContainer = document.createElement('div');
+            messageContainer.classList.add('message');
+            messageContainer.innerHTML = `
+                <img src="${data.avatar}" alt="Avatar" />
+                <div class="message-content">
+                    <div class="message-username">${data.username}</div>
+                    <div class="message-timestamp">${data.timestamp}</div>
+                    <div>${data.message}</div>
+                </div>
+            `;
+            chatMessages.appendChild(messageContainer);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        sendButton.addEventListener('click', () => {
             const message = messageInput.value;
-            if (message.trim()) {
-                socket.emit("send_message", { room_id: currentRoomId, message: message });
-                messageInput.value = "";
+            if (message) {
+                socket.emit('send_message', { room_id: currentRoomId, message });
+                messageInput.value = '';
             }
         });
 
-        messageInput.addEventListener("keydown", (event) => {
-            if (event.key === "Enter") {
-                sendButton.click();
-            }
-        });
-
-        emojiButton.addEventListener("click", () => {
-            emojiPicker.style.display = emojiPicker.style.display === "none" ? "block" : "none";
-        });
-
-        emojiPicker.addEventListener("click", (event) => {
-            if (event.target.classList.contains("emoji")) {
-                messageInput.value += event.target.textContent;
-                emojiPicker.style.display = "none";
-            }
-        });
-
-        updateUsernameButton.addEventListener("click", () => {
+        updateUsernameButton.addEventListener('click', () => {
             const newUsername = usernameInput.value;
-            if (newUsername.trim()) {
-                socket.emit("update_username", { username: newUsername });
+            if (newUsername) {
+                socket.emit('update_username', { username: newUsername });
+                currentUsername = newUsername;
+                currentUsernameSpan.textContent = `Your username: ${currentUsername}`;
+                usernameInput.value = '';
             }
         });
 
-        updateGenderButton.addEventListener("click", () => {
-            genderButtons.style.display = genderButtons.style.display === "none" ? "block" : "none";
+        updateGenderButton.addEventListener('click', () => {
+            genderButtons.style.display = 'block';
         });
 
-        genderButtons.addEventListener("click", (event) => {
-            if (event.target.classList.contains("gender-button")) {
-                const gender = event.target.getAttribute("data-gender");
-                socket.emit("update_gender", { gender: gender });
-                genderButtons.style.display = "none";
+        genderButtons.addEventListener('click', (event) => {
+            if (event.target.classList.contains('gender-button')) {
+                const gender = event.target.getAttribute('data-gender');
+                socket.emit('set_gender', { gender });
+                genderButtons.style.display = 'none';
             }
         });
 
-        createRoomButton.addEventListener("click", () => {
-            roomContainer.style.display = "block";
+        createRoomButton.addEventListener('click', () => {
+            roomContainer.style.display = 'block';
         });
 
-        createRoomSubmit.addEventListener("click", () => {
+        createRoomSubmit.addEventListener('click', () => {
             const roomName = roomNameInput.value;
             const roomType = roomTypeSelect.value;
             const roomPassword = roomPasswordInput.value;
-            if (roomName.trim()) {
-                socket.emit("create_room", { room_name: roomName, room_type: roomType, room_password: roomPassword });
+            if (roomName && roomType) {
+                socket.emit('create_room', { room_name: roomName, room_type: roomType, room_password: roomPassword });
+                roomContainer.style.display = 'none';
             }
         });
 
-        joinRoomButton.addEventListener("click", () => {
-            socket.emit("get_rooms");
-            joinRoomContainer.style.display = "block";
+                joinRoomButton.addEventListener('click', () => {
+            joinRoomContainer.style.display = 'block';
+            socket.emit('get_rooms');
         });
 
-        roomsList.addEventListener("click", (event) => {
-            if (event.target.classList.contains("room-button")) {
-                const roomId = event.target.getAttribute("data-room-id");
-                const roomType = event.target.getAttribute("data-room-type");
-                if (roomType === "private") {
-                    joinRoomPasswordInput.style.display = "block";
-                    joinRoomSubmit.style.display = "block";
-                    joinRoomSubmit.setAttribute("data-room-id", roomId);
-                } else {
-                    socket.emit("join_room", { room_id: roomId });
-                }
+        socket.on('rooms_list', (data) => {
+            roomsList.innerHTML = '';
+            data.rooms.forEach(room => {
+                const roomItem = document.createElement('li');
+                roomItem.textContent = room.room_name;
+                const joinButton = document.createElement('button');
+                joinButton.classList.add('room-button');
+                joinButton.textContent = 'Join';
+                joinButton.addEventListener('click', () => {
+                    currentRoomId = room.room_id;
+                    if (room.room_type === 'private') {
+                        joinRoomPasswordInput.style.display = 'block';
+                        joinRoomSubmit.style.display = 'block';
+                    } else {
+                        socket.emit('join_room', { room_id: room.room_id, username: currentUsername });
+                    }
+                });
+                roomItem.appendChild(joinButton);
+                roomsList.appendChild(roomItem);
+            });
+        });
+
+        joinRoomSubmit.addEventListener('click', () => {
+            const password = joinRoomPasswordInput.value;
+            socket.emit('join_room', { room_id: currentRoomId, username: currentUsername, password });
+            joinRoomPasswordInput.value = '';
+            joinRoomPasswordInput.style.display = 'none';
+            joinRoomSubmit.style.display = 'none';
+        });
+
+        emojiButton.addEventListener('click', () => {
+            emojiPicker.style.display = emojiPicker.style.display === 'block' ? 'none' : 'block';
+        });
+
+        emojiPicker.addEventListener('click', (event) => {
+            if (event.target.classList.contains('emoji')) {
+                messageInput.value += event.target.textContent;
+                emojiPicker.style.display = 'none';
             }
         });
 
-        joinRoomSubmit.addEventListener("click", () => {
-            const roomId = joinRoomSubmit.getAttribute("data-room-id");
-            const roomPassword = joinRoomPasswordInput.value;
-            socket.emit("join_room", { room_id: roomId, password: roomPassword });
+        socket.on("join_error", (data) => {
+            alert(data.error);
         });
 
-        function addMessage(message, type, username = "", avatar = "", timestamp = "") {
-            const messageElement = document.createElement("div");
-            messageElement.classList.add("message");
-            if (type === "user") {
-                messageElement.innerHTML = `
-                    <img src="${avatar}" alt="Avatar" />
-                    <div class="message-content">
-                        <div class="message-username">${username}</div>
-                        <div>${message}</div>
-                        <div class="message-timestamp">${timestamp}</div>
-                    </div>
-                `;
-            } else if (type === "system") {
-                messageElement.classList.add("system-message");
-                messageElement.textContent = message;
-            }
-            chatMessages.appendChild(messageElement);
+        socket.on("room_joined", (data) => {
+            currentRoomId = data.room_id;
+            alert(`Joined room: ${data.room_name}`);
+        });
+
+        socket.on("user_joined_room", (data) => {
+            const systemMessage = document.createElement('div');
+            systemMessage.classList.add('system-message');
+            systemMessage.textContent = `${data.username} has joined the room.`;
+            chatMessages.appendChild(systemMessage);
             chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+        });
+
+        socket.on("user_left_room", (data) => {
+            const systemMessage = document.createElement('div');
+            systemMessage.classList.add('system-message');
+            systemMessage.textContent = `${data.username} has left the room.`;
+            chatMessages.appendChild(systemMessage);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        socket.on("room_closed", (data) => {
+            alert(`Room ${data.room_id} has been closed.`);
+        });
     </script>
 </body>
 </html>

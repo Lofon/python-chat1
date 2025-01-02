@@ -1,30 +1,30 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import random
+from datetime import datetime
 
 app = Flask(__name__)
 socketio = SocketIO(app)
 
-# python dict. Store connected users. Key is socket id, value is username and avatarUrl 
+# python dict. Store connected users. Key is socket id, value is username, avatarUrl and gender
 users = {}
-rooms = {}  # Stores room info
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# we're listening for the connect event
 @socketio.on("connect")
 def handle_connect():
-    emit("prompt_user_info")
-
-@socketio.on("user_info")
-def handle_user_info(data):
-    username = data["username"]
-    gender = data["gender"]
+    username = f"User_{random.randint(1000,9999)}"
+    gender = random.choice(["girl", "boy"])
+    # https://avatar.iran.liara.run/public/boy?username=User_123
     avatar_url = f"https://avatar.iran.liara.run/public/{gender}?username={username}"
-    users[request.sid] = {"username": username, "avatar": avatar_url}
+
+    users[request.sid] = { "username": username, "avatar": avatar_url, "gender": gender }
+
     emit("user_joined", {"username": username, "avatar": avatar_url}, broadcast=True)
-    emit("set_username", {"username": username})
+    emit("set_user_info", {"username": username, "gender": gender})
 
 @socketio.on("disconnect")
 def handle_disconnect():
@@ -36,54 +36,35 @@ def handle_disconnect():
 def handle_message(data):
     user = users.get(request.sid)
     if user:
+        timestamp = datetime.now().strftime('%H:%M:%S')
         emit("new_message", {
             "username": user["username"],
             "avatar": user["avatar"],
             "message": data["message"],
-            "time": data["time"]
-        }, room=data["room"])
+            "timestamp": timestamp
+        }, broadcast=True)
 
 @socketio.on("update_username")
 def handle_update_username(data):
     old_username = users[request.sid]["username"]
     new_username = data["username"]
     users[request.sid]["username"] = new_username
+
     emit("username_updated", {
         "old_username": old_username,
         "new_username": new_username
     }, broadcast=True)
 
-@socketio.on("create_room")
-def handle_create_room(data):
-    room_name = data["room_name"]
-    private = data["private"]
-    password = data["password"] if private else None
-    rooms[room_name] = {"private": private, "password": password, "users": []}
-    emit("room_created", {"room_name": room_name})
+@socketio.on("update_gender")
+def handle_update_gender(data):
+    users[request.sid]["gender"] = data["gender"]
+    avatar_url = f"https://avatar.iran.liara.run/public/{data['gender']}?username={users[request.sid]['username']}"
+    users[request.sid]["avatar"] = avatar_url
 
-@socketio.on("join_room")
-def handle_join_room(data):
-    room_name = data["room_name"]
-    room = rooms.get(room_name)
-    if room:
-        if room["private"] and room["password"] != data["password"]:
-            emit("join_error", {"error": "Incorrect password"})
-        else:
-            rooms[room_name]["users"].append(request.sid)
-            join_room(room_name)
-            emit("room_joined", {"room_name": room_name})
-            emit("user_joined_room", {"username": users[request.sid]["username"]}, room=room_name)
-    else:
-        emit("join_error", {"error": "Room not found"})
-
-@socketio.on("leave_room")
-def handle_leave_room(data):
-    room_name = data["room_name"]
-    if room_name in rooms:
-        rooms[room_name]["users"].remove(request.sid)
-        leave_room(room_name)
-        emit("room_left", {"room_name": room_name})
-        emit("user_left_room", {"username": users[request.sid]["username"]}, room=room_name)
+    emit("gender_updated", {
+        "username": users[request.sid]["username"],
+        "avatar": avatar_url
+    })
 
 if __name__ == "__main__":
     socketio.run(app)

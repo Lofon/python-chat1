@@ -92,11 +92,13 @@
             display: flex;
             padding: 20px;
             background-color: white;
-            border-top: 1px solid var(--secondary-color);
+            border-top: 1px solid var (--secondary-color);
         }
 
         #message-input,
-        #username-input {
+        #username-input,
+        #room-name-input,
+        #password-input {
             flex-grow: 1;
             padding: 12px;
             border: 1px solid var(--secondary-color);
@@ -108,6 +110,8 @@
         #send-button,
         #update-username-button,
         #update-gender-button,
+        #create-room-button,
+        #join-room-button,
         #emoji-button {
             background-color: var(--primary-color);
             color: white;
@@ -122,6 +126,8 @@
         #send-button:hover,
         #update-username-button:hover,
         #update-gender-button:hover,
+        #create-room-button:hover,
+        #join-room-button:hover,
         #emoji-button:hover {
             background-color: var(--primary-dark);
         }
@@ -136,7 +142,7 @@
         #current-username {
             margin-right: 10px;
             font-weight: bold;
-            color: var(--primary-dark);
+            color: var (--primary-dark);
         }
 
         .system-message {
@@ -166,50 +172,54 @@
             margin-right: 0;
             margin-left: 10px;
         }
+.message.sent img {
+    margin-right: 0;
+    margin-left: 10px;
+}
 
-        #emoji-picker {
-            display: none;
-            position: absolute;
-            bottom: 60px;
-            background: white;
-            border: 1px solid var(--secondary-color);
-            border-radius: 10px;
-            padding: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
+#emoji-picker {
+    display: none;
+    position: absolute;
+    bottom: 60px;
+    background: white;
+    border: 1px solid var(--secondary-color);
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
 
-        .emoji {
-            font-size: 24px;
-            cursor: pointer;
-            padding: 5px;
-            transition: background-color 0.3s ease;
-        }
+.emoji {
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px;
+    transition: background-color 0.3s ease;
+}
 
-        .emoji:hover {
-            background-color: var(--secondary-color);
-        }
+.emoji:hover {
+    background-color: var(--secondary-color);
+}
 
-        .gender-button {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
-            margin-right: 10px;
-        }
+.gender-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+    margin-right: 10px;
+}
 
-        .gender-button:hover {
-            background-color: var(--primary-dark);
-        }
+.gender-button:hover {
+    background-color: var(--primary-dark);
+}
 
-        #gender-buttons {
-            display: none;
-        }
-    </style>
+#gender-buttons {
+    display: none;
+}
+</style>
 </head>
 <body>
     <div class="chat-container">
@@ -223,6 +233,23 @@
                 <button class="gender-button" data-gender="boy">Boy</button>
                 <button class="gender-button" data-gender="girl">Girl</button>
             </div>
+            <button id="create-room-button">Create Room</button>
+            <button id="join-room-button">Join Room</button>
+        </div>
+        <div id="room-container" style="display: none;">
+            <input type="text" id="room-name-input" placeholder="Room Name" />
+            <select id="room-type-select">
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+            </select>
+            <input type="password" id="room-password-input" placeholder="Room Password (6 digits)" maxlength="6" style="display: none;" />
+            <button id="create-room-submit">Create</button>
+        </div>
+        <div id="join-room-container" style="display: none;">
+            <ul id="rooms-list"></ul>
+            <input type="text" id="join-room-id-input" placeholder="Room ID" />
+            <input type="password" id="join-room-password-input" placeholder="Room Password" maxlength="6" style="display: none;" />
+            <button id="join-room-submit">Join</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input">
@@ -250,8 +277,21 @@
         const updateUsernameButton = document.getElementById("update-username-button");
         const updateGenderButton = document.getElementById("update-gender-button");
         const genderButtons = document.getElementById("gender-buttons");
+        const createRoomButton = document.getElementById("create-room-button");
+        const joinRoomButton = document.getElementById("join-room-button");
+        const roomContainer = document.getElementById("room-container");
+        const joinRoomContainer = document.getElementById("join-room-container");
+        const roomNameInput = document.getElementById("room-name-input");
+        const roomTypeSelect = document.getElementById("room-type-select");
+        const roomPasswordInput = document.getElementById("room-password-input");
+        const createRoomSubmit = document.getElementById("create-room-submit");
+        const roomsList = document.getElementById("rooms-list");
+        const joinRoomIdInput = document.getElementById("join-room-id-input");
+        const joinRoomPasswordInput = document.getElementById("join-room-password-input");
+        const joinRoomSubmit = document.getElementById("join-room-submit");
 
         let currentUsername = "";
+        let currentRoomId = "";
 
         socket.on("set_user_info", (data) => {
             currentUsername = data.username;
@@ -282,6 +322,39 @@
             addMessage(`${data.username} updated their gender`, "system");
         });
 
+        socket.on("room_created", (data) => {
+            alert(`Room created with ID: ${data.room_id}`);
+            currentRoomId = data.room_id;
+            roomContainer.style.display = "none";
+        });
+
+        socket.on("rooms_list", (data) => {
+            roomsList.innerHTML = "";
+            data.rooms.forEach(room => {
+                const li = document.createElement("li");
+                li.textContent = `Room Name: ${room.room_name}, Room ID: ${room.room_id}`;
+                roomsList.appendChild(li);
+            });
+        });
+
+        socket.on("room_joined", (data) => {
+            alert(`Joined room: ${data.room_name}`);
+            currentRoomId = data.room_id;
+            joinRoomContainer.style.display = "none";
+        });
+
+        socket.on("join_error", (data) => {
+            alert(data.error);
+        });
+
+        socket.on("user_joined_room", (data) => {
+            addMessage(`${data.username} joined the room`, "system");
+        });
+
+        socket.on("user_left_room", (data) => {
+            addMessage(`${data.username} left the room`, "system");
+        });
+
         sendButton.addEventListener("click", sendMessage);
         messageInput.addEventListener("keypress", (e) => {
             if (e.key === "Enter") sendMessage();
@@ -308,11 +381,47 @@
             });
         });
 
-        function sendMessage() {
+        createRoomButton.addEventListener("click", () => {
+            roomContainer.style.display = "block";
+        });
+
+        createRoomSubmit.addEventListener("click", createRoom);
+
+        joinRoomButton.addEventListener("click", () => {
+            joinRoomContainer.style.display = "block";
+            socket.emit("get_rooms");
+        });
+
+        joinRoomSubmit.addEventListener("click", joinRoom);
+
+        roomTypeSelect.addEventListener("change", () => {
+            roomPasswordInput.style.display = roomTypeSelect.value === "private" ? "block" : "none";
+        });
+
+         function sendMessage() {
             const message = messageInput.value.trim();
-            if (message) {
-                socket.emit("send_message", { message });
+            if (message && currentRoomId) {
+                socket.emit("send_message", { message, room_id: currentRoomId });
                 messageInput.value = "";
+            }
+        }
+
+        function createRoom() {
+            const roomName = roomNameInput.value.trim();
+            const roomType = roomTypeSelect.value;
+            const roomPassword = roomType === "private" ? roomPasswordInput.value : null;
+
+            if (roomName) {
+                socket.emit("create_room", { room_name: roomName, room_type: roomType, room_password: roomPassword });
+            }
+        }
+
+        function joinRoom() {
+            const roomId = joinRoomIdInput.value.trim();
+            const password = roomTypeSelect.value === "private" ? joinRoomPasswordInput.value : null;
+
+            if (roomId) {
+                socket.emit("join_room", { room_id: roomId, username: currentUsername, password: password });
             }
         }
 

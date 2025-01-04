@@ -45,37 +45,20 @@ def handle_create_room(data):
 
 @socketio.on("join_room")
 def handle_join_room(data):
-    new_room_id = data["room_id"]
+    room_id = data["room_id"]
     username = data["username"]
     password = data.get("password", None)
 
-    # Leave current room if user is already in a room
-    current_room_id = None
-    for room_id, room in rooms.items():
-        if request.sid in room["users"]:
-            current_room_id = room_id
-            break
-
-    if current_room_id:
-        leave_room(current_room_id)
-        rooms[current_room_id]["users"].pop(request.sid, None)
-        emit("user_left_room", {"username": username}, room=current_room_id)
-        if not rooms[current_room_id]["users"]:
-            rooms.pop(current_room_id)
-            emit("room_closed", {"room_id": current_room_id})
-
-    # Join the new room
-    if new_room_id in rooms:
-        room = rooms[new_room_id]
+    if room_id in rooms:
+        room = rooms[room_id]
         if room["room_type"] == "private" and not check_password_hash(room["room_password"], password):
             emit("join_error", {"error": "Invalid password"})
             return
 
-        join_room(new_room_id)
+        join_room(room_id)
         room["users"][request.sid] = username
-        emit("room_joined", {"room_id": new_room_id, "room_name": room["room_name"], "users": list(room["users"].values())})
-        emit("user_joined_room", {"username": username}, room=new_room_id)
-        emit("refresh_page", {}, room=request.sid)
+        emit("room_joined", {"room_id": room_id, "room_name": room["room_name"], "users": list(room["users"].values())})
+        emit("user_joined_room", {"username": username}, room=room_id)
 
 @socketio.on("leave_room")
 def handle_leave_room(data):

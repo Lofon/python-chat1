@@ -48,21 +48,12 @@ def handle_join_room(data):
     room_id = data["room_id"]
     username = data["username"]
     password = data.get("password", None)
-    current_room = data.get("current_room", None)
 
     if room_id in rooms:
         room = rooms[room_id]
         if room["room_type"] == "private" and not check_password_hash(room["room_password"], password):
             emit("join_error", {"error": "Invalid password"})
             return
-
-        if current_room:
-            leave_room(current_room)
-            emit("room_left", {"room_id": current_room}, room=current_room)
-            rooms[current_room]["users"].pop(request.sid, None)
-            if not rooms[current_room]["users"]:
-                rooms.pop(current_room)
-                emit("room_closed", {"room_id": current_room})
 
         join_room(room_id)
         room["users"][request.sid] = username

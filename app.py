@@ -75,6 +75,7 @@ def handle_join_room(data):
         room["users"][request.sid] = username
         emit("room_joined", {"room_id": new_room_id, "room_name": room["room_name"], "users": list(room["users"].values())})
         emit("user_joined_room", {"username": username}, room=new_room_id)
+        emit("refresh_page", {}, room=request.sid)
 
 @socketio.on("leave_room")
 def handle_leave_room(data):

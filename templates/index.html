@@ -136,8 +136,7 @@
             margin-right: 10px;
             font-size: 16px;
         }
-
-        #send-button,
+	        #send-button,
         #update-username-button,
         #update-gender-button,
         #create-room-button,
@@ -280,7 +279,7 @@
         <div id="join-room-container" style="display: none;">
             <ul id="rooms-list" class="room-list"></ul>
             <input type="password" id="join-room-password-input" placeholder="Room Password" maxlength="6" style="display: none;" />
-        <button id="join-room-submit" class="room-button" style="display: none;">Join</button>
+            <button id="join-room-submit" class="room-button" style="display: none;">Join</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input">
@@ -376,7 +375,7 @@
             }
         });
 
-        updateGenderButton.addEventListener('click', () => {
+                updateGenderButton.addEventListener('click', () => {
             genderButtons.style.display = 'block';
         });
 
@@ -491,10 +490,7 @@
             leaveRoomButton.style.display = 'none';
             chatMessages.innerHTML = '';
         });
-
-        socket.on("refresh_page", () => {
-            window.location.reload();
-        });
     </script>
 </body>
 </html>
+

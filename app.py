@@ -22,7 +22,8 @@ def handle_connect():
 @socketio.on("set_username")
 def set_username(data):
     username = data["username"]
-    emit("set_user_info", {"username": username})
+    gender = data.get("gender", "boy")  # Default to boy if gender is not provided
+    emit("set_user_info", {"username": username, "gender": gender})
 
 @socketio.on("create_room")
 def handle_create_room(data):
@@ -44,6 +45,7 @@ def handle_create_room(data):
 def handle_join_room(data):
     room_id = data["room_id"]
     username = data["username"]
+    gender = data.get("gender", "boy")  # Default to boy if gender is not provided
     password = data.get("password", None)
 
     if room_id in rooms:
@@ -53,18 +55,18 @@ def handle_join_room(data):
             return
 
         join_room(room_id)
-        room["users"][request.sid] = username
+        room["users"][request.sid] = {"username": username, "gender": gender}
         emit("room_joined", {"room_id": room_id, "room_name": room["room_name"], "users": list(room["users"].values())})
         emit("user_joined_room", {"username": username}, room=room_id)
 
 @socketio.on("leave_room")
 def handle_leave_room(data):
     room_id = data["room_id"]
-    username = rooms[room_id]["users"].pop(request.sid, None)
+    user = rooms[room_id]["users"].pop(request.sid, None)
 
-    if username:
+    if user:
         leave_room(room_id)
-        emit("user_left_room", {"username": username}, room=room_id)
+        emit("user_left_room", {"username": user["username"]}, room=room_id)
         if not rooms[room_id]["users"]:
             rooms.pop(room_id)
             emit("room_closed", {"room_id": room_id})
@@ -72,42 +74,31 @@ def handle_leave_room(data):
 @socketio.on("send_message")
 def handle_send_message(data):
     room_id = data["room_id"]
-    username = rooms[room_id]["users"].get(request.sid)
-    if username:
+    user = rooms[room_id]["users"].get(request.sid)
+    if user:
         timestamp = datetime.now().strftime('%H:%M:%S')
         emit("new_message", {
-            "username": username,
-            "avatar": f"https://avatar.iran.liara.run/public/{random.choice(['boy', 'girl'])}?username={username}",
+            "username": user["username"],
+            "avatar": f"https://avatar.iran.liara.run/public/{user['gender']}?username={user['username']}",
             "message": data["message"],
             "timestamp": timestamp
         }, room=room_id)
 
 @socketio.on("update_username")
 def handle_update_username(data):
+    new_username = data["username"]
+    new_gender = data.get("gender", None)
     for room in rooms.values():
         if request.sid in room["users"]:
-            old_username = room["users"][request.sid]
-            new_username = data["username"]
-            room["users"][request.sid] = new_username
+            old_user = room["users"][request.sid]
+            room["users"][request.sid]["username"] = new_username
+            if new_gender:
+                room["users"][request.sid]["gender"] = new_gender
             emit("username_updated", {
-                "old_username": old_username,
-                "new_username": new_username
+                "old_username": old_user["username"],
+                "new_username": new_username,
+                "new_gender": new_gender
             }, room=request.sid)
-
-@socketio.on("update_room_password")
-def handle_update_room_password(data):
-    room_id = data["room_id"]
-    new_password = data["new_password"]
-    if room_id in rooms and rooms[room_id]["room_type"] == "private":
-        rooms[room_id]["room_password"] = generate_password_hash(new_password)
-        emit("room_password_updated", {"room_id": room_id})
-
-@socketio.on("get_room_users")
-def handle_get_room_users(data):
-    room_id = data["room_id"]
-    if room_id in rooms:
-        users = list(rooms[room_id]["users"].values())
-        emit("room_users", {"room_id": room_id, "users": users})
 
 @socketio.on("get_rooms")
 def handle_get_rooms():

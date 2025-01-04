@@ -136,7 +136,7 @@
             margin-right: 10px;
             font-size: 16px;
         }
-	        #send-button,
+        #send-button,
         #update-username-button,
         #update-gender-button,
         #create-room-button,
@@ -295,6 +295,7 @@
             </div>
         </div>
     </div>
+
     <script>
         const socket = io();
         const chatMessages = document.getElementById("chat-messages");
@@ -334,7 +335,8 @@
 
         socket.on("room_joined", (data) => {
             alert(`Joined room: ${data.room_name}`);
-            leaveRoomButton.style.display = "block"; // Show leave room button when user joins a room
+            leaveRoomButton.style.display = "block";
+            chatMessages.innerHTML = ''; // Clear chat messages when joining a new room
         });
 
         socket.on("new_message", (data) => {
@@ -375,7 +377,7 @@
             }
         });
 
-                updateGenderButton.addEventListener('click', () => {
+        updateGenderButton.addEventListener('click', () => {
             genderButtons.style.display = 'block';
         });
 
@@ -428,7 +430,7 @@
                         joinRoomPasswordInput.style.display = 'block';
                         joinRoomSubmit.style.display = 'block';
                     } else {
-                        socket.emit('join_room', { room_id: room.room_id, username: currentUsername });
+                        socket.emit('join_room', { room_id: room.room_id, username: currentUsername, current_room: currentRoomId });
                     }
                 });
                 roomItem.appendChild(joinButton);
@@ -438,7 +440,7 @@
 
         joinRoomSubmit.addEventListener('click', () => {
             const password = joinRoomPasswordInput.value;
-            socket.emit('join_room', { room_id: currentRoomId, username: currentUsername, password });
+            socket.emit('join_room', { room_id: currentRoomId, username: currentUsername, password, current_room: currentRoomId });
             joinRoomPasswordInput.value = '';
             joinRoomPasswordInput.style.display = 'none';
             joinRoomSubmit.style.display = 'none';
@@ -492,5 +494,4 @@
         });
     </script>
 </body>
-</html>
-
+</html> 
